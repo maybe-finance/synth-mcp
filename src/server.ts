@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
 import cors from "cors";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import { SynthClient } from "./synth-client.js";
 import * as tools from "./tools/index.js";
@@ -17,11 +18,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Store registered endpoints with their API keys
+const registeredEndpoints = new Map<string, { apiKey: string; createdAt: Date }>();
+
 // Enable CORS for Claude Desktop
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
 
@@ -32,30 +36,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'synth-mcp' });
 });
 
-// SSE endpoint for MCP
-app.get('/sse', async (req, res) => {
-  console.log('SSE endpoint accessed');
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  console.log('Query params:', JSON.stringify(req.query, null, 2));
-  
-  // Check multiple places for API key
-  let apiKey = 
-    req.headers.authorization?.replace('Bearer ', '') ||
-    req.headers['x-api-key'] as string ||
-    req.query.apiKey as string ||
-    req.query.api_key as string;
-  
-  if (!apiKey) {
-    // Return HTML page for API key entry when accessed via browser
-    const acceptHeader = req.headers.accept || '';
-    if (acceptHeader.includes('text/html')) {
-      const html = `
+// Root endpoint - show registration page
+app.get('/', (req, res) => {
+  const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connect Synth MCP to Claude</title>
+  <title>Synth MCP Server</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -71,7 +60,7 @@ app.get('/sse', async (req, res) => {
       padding: 2rem;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      max-width: 400px;
+      max-width: 600px;
       width: 100%;
     }
     h1 {
@@ -113,10 +102,22 @@ app.get('/sse', async (req, res) => {
     button:hover {
       background: #0056b3;
     }
-    .error {
-      color: #dc3545;
-      margin-top: 0.5rem;
-      font-size: 0.875rem;
+    .success {
+      display: none;
+      background: #d4edda;
+      color: #155724;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+    .endpoint-url {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 4px;
+      font-family: monospace;
+      word-break: break-all;
+      margin: 1rem 0;
+      border: 1px solid #dee2e6;
     }
     .info {
       background: #e7f3ff;
@@ -126,22 +127,13 @@ app.get('/sse', async (req, res) => {
       font-size: 0.875rem;
       color: #004080;
     }
-    .success {
-      display: none;
-      background: #d4edda;
-      color: #155724;
-      padding: 1rem;
-      border-radius: 4px;
-      margin-top: 1rem;
-      text-align: center;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Connect Synth to Claude</h1>
+    <h1>Connect Synth to Claude Desktop</h1>
     <div class="info">
-      To connect Claude to your Synth Finance account, you need to update your Claude Desktop configuration.
+      Generate a unique endpoint URL for your Synth MCP connection.
     </div>
     <form id="authForm">
       <div class="form-group">
@@ -154,57 +146,108 @@ app.get('/sse', async (req, res) => {
           required
         />
       </div>
-      <button type="submit">Generate Configuration</button>
-      <div id="error" class="error"></div>
+      <button type="submit">Generate Endpoint</button>
     </form>
     <div id="success" class="success">
-      <h2>Configuration Generated!</h2>
-      <p>Add this to your Claude Desktop MCP settings:</p>
-      <pre id="config" style="background: #f8f9fa; padding: 1rem; border-radius: 4px; text-align: left; overflow-x: auto;"></pre>
+      <h2>Success!</h2>
+      <p>Your unique MCP endpoint URL is:</p>
+      <div id="endpointUrl" class="endpoint-url"></div>
+      <p>Add this URL to Claude Desktop as your MCP server endpoint.</p>
     </div>
   </div>
   <script>
     document.getElementById('authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const apiKey = document.getElementById('apiKey').value;
-      const errorDiv = document.getElementById('error');
-      const successDiv = document.getElementById('success');
-      const configPre = document.getElementById('config');
       
-      // Generate configuration
-      const config = {
-        "synth": {
-          "command": "npx",
-          "args": ["-y", "synth-mcp"],
-          "env": {
-            "SYNTH_API_KEY": apiKey
-          }
+      try {
+        const response = await fetch('/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          const endpointUrl = window.location.origin + '/sse/' + data.endpoint;
+          document.getElementById('endpointUrl').textContent = endpointUrl;
+          document.getElementById('success').style.display = 'block';
+          
+          // Copy to clipboard
+          navigator.clipboard.writeText(endpointUrl).then(() => {
+            document.getElementById('success').innerHTML += '<p style="color: #28a745; margin-top: 0.5rem;">✓ Copied to clipboard!</p>';
+          });
+        } else {
+          alert(data.error || 'Registration failed');
         }
-      };
-      
-      // Show configuration
-      configPre.textContent = JSON.stringify(config, null, 2);
-      successDiv.style.display = 'block';
-      errorDiv.textContent = '';
-      
-      // Copy to clipboard
-      navigator.clipboard.writeText(JSON.stringify(config, null, 2)).then(() => {
-        successDiv.innerHTML += '<p style="color: #28a745; margin-top: 0.5rem;">✓ Copied to clipboard!</p>';
-      }).catch(() => {
-        successDiv.innerHTML += '<p style="margin-top: 0.5rem;">Please copy the configuration above.</p>';
-      });
+      } catch (error) {
+        alert('Connection error. Please try again.');
+      }
     });
   </script>
 </body>
 </html>
-      `;
-      res.send(html);
-      return;
-    }
+  `;
+  res.send(html);
+});
+
+// Registration endpoint
+app.post('/register', async (req, res) => {
+  const { apiKey } = req.body;
+  
+  if (!apiKey) {
+    return res.status(400).json({ error: 'API key is required' });
+  }
+  
+  try {
+    // Validate API key
+    const synthClient = new SynthClient(apiKey);
+    await synthClient.getUser();
     
+    // Generate unique endpoint
+    const endpoint = crypto.randomBytes(16).toString('hex');
+    
+    // Store the mapping
+    registeredEndpoints.set(endpoint, {
+      apiKey,
+      createdAt: new Date()
+    });
+    
+    res.json({ success: true, endpoint });
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid API key' });
+  }
+});
+
+// SSE endpoint for MCP with unique endpoints
+app.get('/sse/:endpoint?', async (req, res) => {
+  console.log('SSE endpoint accessed');
+  console.log('Endpoint:', req.params.endpoint);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  
+  let apiKey: string | undefined;
+  
+  // Check if this is a registered endpoint
+  if (req.params.endpoint) {
+    const registration = registeredEndpoints.get(req.params.endpoint);
+    if (registration) {
+      apiKey = registration.apiKey;
+    }
+  }
+  
+  // Fall back to header/query param for backwards compatibility
+  if (!apiKey) {
+    apiKey = 
+      req.headers.authorization?.replace('Bearer ', '') ||
+      req.headers['x-api-key'] as string ||
+      req.query.apiKey as string;
+  }
+  
+  if (!apiKey) {
     res.status(401).json({ 
-      error: 'API key required',
-      message: 'Please provide your Synth API key via Authorization header, X-API-Key header, or apiKey query parameter'
+      error: 'Authentication required',
+      message: 'Please visit the root URL to register and get your unique endpoint'
     });
     return;
   }
@@ -286,7 +329,20 @@ app.post('/message', (req, res) => {
   res.status(200).send();
 });
 
+// Clean up old registrations periodically (older than 30 days)
+setInterval(() => {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  for (const [endpoint, registration] of registeredEndpoints.entries()) {
+    if (registration.createdAt < thirtyDaysAgo) {
+      registeredEndpoints.delete(endpoint);
+    }
+  }
+}, 24 * 60 * 60 * 1000); // Daily cleanup
+
 app.listen(PORT, () => {
   console.log(`Synth MCP running on http://localhost:${PORT}`);
+  console.log(`Registration page: http://localhost:${PORT}`);
   console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
 });
