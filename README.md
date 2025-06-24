@@ -1,105 +1,151 @@
-# Synth MCP Server
+# Synth MCP
 
-An MCP (Model Context Protocol) server that provides tools for interacting with the Synth Finance API. This server enables AI assistants to access financial data, currency information, stock prices, and more through the Synth API.
+A remote MCP (Model Context Protocol) server that provides AI assistants with access to the Synth Finance API. This server enables Claude Desktop and other MCP-compatible clients to access financial data, currency information, stock prices, insider trading data, and more through natural language queries.
 
 ## Features
 
-- **Transaction Enrichment**: Transform cryptic bank transactions into meaningful merchant data
-- **Exchange Rates**: Get live and historical exchange rates between currencies
-- **Stock Market Data**: Search tickers and access open/close price data
-- **User Information**: Access user account data
-- **Insider Trading Data**: Access insider trading information
+- **🏦 Transaction Enrichment**: Decode cryptic bank transactions into clear merchant information with logos, locations, and categories
+- **💱 Currency Exchange Rates**: Access real-time and historical exchange rates for all major currencies
+- **📈 Stock Market Data**: Search tickers and retrieve historical OHLC price data
+- **👔 Insider Trading Data**: Access comprehensive SEC Form 4 filings and executive trading activity
+- **👤 User Account Info**: Check API usage, credits remaining, and account details
 
-## Installation
+## Quick Start
 
-```bash
-npm install synth-mcp-server
-```
+### For Users
 
-## Setup
+Simply add this to your Claude Desktop configuration:
 
-1. Get your Synth API key from [Synth Finance](https://synthfinance.com)
-
-2. Create a `.env` file in your project root:
-```bash
-cp .env.example .env
-```
-
-3. Add your API key to the `.env` file:
-```
-SYNTH_API_KEY=your_synth_api_key_here
-```
-
-## Usage with Claude Desktop
-
-Add the server to your Claude Desktop configuration:
-
-### macOS
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`  
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "synth": {
-      "command": "npx",
-      "args": ["synth-mcp-server"],
-      "env": {
-        "SYNTH_API_KEY": "your_synth_api_key_here"
+      "url": "https://mcp.synthfinance.com/sse",
+      "transport": "sse",
+      "headers": {
+        "Authorization": "Bearer YOUR_SYNTH_API_KEY"
       }
     }
   }
 }
 ```
 
-### Windows
-Edit `%APPDATA%\Claude\claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "synth": {
-      "command": "npx",
-      "args": ["synth-mcp-server"],
-      "env": {
-        "SYNTH_API_KEY": "your_synth_api_key_here"
-      }
-    }
-  }
-}
-```
+Get your API key at [synthfinance.com](https://synthfinance.com).
 
 ## Available Tools
 
-### Transaction Tools
-- `enrichTransaction`: Enrich bank transaction descriptions with merchant data
+### 💳 `enrichTransaction`
+Decode cryptic bank and credit card transactions into meaningful merchant information.
 
-### Financial Data Tools
-- `getLiveRates`: Get real-time exchange rates (updated every 60 seconds)
-- `getHistoricalRates`: Get historical exchange rates for a specific date
+**Example queries:**
+- "What is this charge: SQ *COFFEE SHOP 4155551234"
+- "Decode TST* MERCHANT NAME 123"
+- "Identify this transaction: WM SUPERCENTER #1234"
 
-### Stock Market Tools
-- `searchTickers`: Search for stocks by symbol or company name
-- `getOpenClosePrices`: Get open/close prices for a date range
-- `getInsiderTrades`: Get insider trading activity for any stock ticker
+### 💵 `getLiveRates`
+Get real-time currency exchange rates (updated every 60 seconds).
 
-### User Tools
-- `getUserInfo`: Get user account information and API usage
+**Example queries:**
+- "What's the current USD to EUR exchange rate?"
+- "Convert 100 dollars to euros"
+- "Get live forex rates for major currencies"
 
-## Tips for Better Tool Usage
+### 📊 `getHistoricalRates`
+Get historical exchange rates for any past date.
 
-To help Claude and other LLMs use these tools more effectively:
+**Example queries:**
+- "What was the USD to EUR rate on January 1, 2023?"
+- "Get exchange rates from last month"
+- "Historical EUR/USD rate for tax purposes"
 
-1. **Be specific with your queries** - Instead of "tell me about AAPL", try:
-   - "What are the recent insider trades for AAPL?"
-   - "Get the insider trading activity for Apple stock"
-   - "Show me the last insider transactions for ticker AAPL"
+### 🔍 `searchTickers`
+Search for stock tickers by company name or symbol.
 
-2. **Use keywords that match the tool's purpose**:
-   - For insider trades: "insider trading", "executive trades", "insider activity"
-   - For transactions: "decode this transaction", "what is this bank charge"
-   - For rates: "exchange rate", "currency conversion", "forex"
+**Example queries:**
+- "Find ticker for Apple"
+- "What's the stock symbol for Microsoft?"
+- "Search for renewable energy stocks"
 
-3. **Include ticker symbols** when asking about stocks (e.g., AAPL, MSFT, GOOGL)
+### 📈 `getOpenClosePrices`
+Get historical stock price data (OHLC) for any date range.
+
+**Example queries:**
+- "Get AAPL stock prices for January 2024"
+- "Show me Tesla's price history for last quarter"
+- "OHLC data for NVDA from 2023"
+
+### 👔 `getInsiderTrades`
+Access insider trading activity and SEC Form 4 filings.
+
+**Example queries:**
+- "Show insider trades for AAPL"
+- "Recent insider activity for Tesla"
+- "Which executives are buying MSFT?"
+
+### 👤 `getUserInfo`
+Get your Synth account information and API usage.
+
+**Example queries:**
+- "Show my account information"
+- "How many API credits do I have left?"
+- "Check my API usage"
+
+## Enhanced Tool Discovery
+
+This MCP server includes extensive keyword optimization to ensure tools are triggered appropriately. Each tool responds to hundreds of related terms and natural language patterns, making it more likely that your queries will use the Synth API rather than web search.
+
+## Self-Hosting
+
+### Deploy to Railway (Recommended)
+
+1. **Push to GitHub:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/yourusername/synth-mcp.git
+   git push -u origin main
+   ```
+
+2. **Deploy on Railway:**
+   - Go to [railway.app](https://railway.app)
+   - Click "New Project" → "Deploy from GitHub"
+   - Select your repository
+   - Railway automatically deploys!
+
+3. **Add Custom Domain:**
+   - In Railway: Settings → Networking → Add your domain
+   - In your DNS: Add CNAME record pointing to Railway
+
+### Deploy with Docker
+
+```bash
+docker build -t synth-mcp .
+docker run -p 3000:3000 synth-mcp
+```
+
+### Deploy to Heroku
+
+```bash
+heroku create your-synth-mcp
+git push heroku main
+```
+
+## API Endpoints
+
+- `GET /health` - Health check endpoint
+- `GET /sse` - SSE endpoint for MCP communication
+- `POST /message` - Message handling endpoint
+
+## Security
+
+- API keys are passed through headers and never stored on the server
+- Each user provides their own Synth API key
+- Always use HTTPS in production
+- CORS is configured for secure cross-origin access
 
 ## Development
 
@@ -107,17 +153,34 @@ To help Claude and other LLMs use these tools more effectively:
 # Install dependencies
 npm install
 
-# Build the project
-npm run build
-
 # Run in development mode
 npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
 ```
 
-## API Documentation
+## Environment Variables
 
-For detailed API documentation, visit [Synth Finance API Docs](https://docs.synthfinance.com)
+- `PORT` - Server port (default: 3000, automatically set by most hosting platforms)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
 ISC
+
+## Support
+
+- **Synth API Documentation**: [docs.synthfinance.com](https://docs.synthfinance.com)
+- **Get API Key**: [synthfinance.com](https://synthfinance.com)
+- **MCP Documentation**: [modelcontextprotocol.io](https://modelcontextprotocol.io)
+
+---
+
+Built with ❤️ by [Synth Finance](https://synthfinance.com)

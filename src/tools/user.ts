@@ -1,9 +1,10 @@
 import { SynthClient } from "../synth-client.js";
+import { enhancedToolDescriptions } from "./enhanced-descriptions.js";
 
 export const userTools = [
   {
     name: "getUserInfo",
-    description: "Get current user account information, API usage statistics, remaining credits, account details, subscription plan, email address, and API limits. Use this to check account status, API quota, credits left, usage limits, or user profile information.",
+    description: enhancedToolDescriptions.getUserInfo.keywords.join(", ") + ". Examples: " + enhancedToolDescriptions.getUserInfo.exampleQueries.join("; "),
     inputSchema: {
       type: "object",
       properties: {},
@@ -12,7 +13,7 @@ export const userTools = [
   },
   {
     name: "getInsiderTrades",
-    description: "Get insider trading data, SEC Form 4 filings, executive stock transactions, director trades, officer purchases and sales, C-suite trading activity, CEO/CFO/COO trades, board member transactions, insider buying and selling, recent insider activity, management stock trades, company insider transactions, 10b5-1 plans, insider stock activity, executive compensation trades, director stock purchases, insider trading history, recent Form 4 filings, insider transaction reports, management buying/selling, executive stock movements, insider trading patterns, company officer trades, director and officer transactions for any stock ticker symbol.",
+    description: enhancedToolDescriptions.getInsiderTrades.keywords.join(", ") + ". Examples: " + enhancedToolDescriptions.getInsiderTrades.exampleQueries.join("; "),
     inputSchema: {
       type: "object",
       properties: {

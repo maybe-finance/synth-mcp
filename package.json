@@ -1,15 +1,17 @@
 {
-  "name": "synth-mcp-server",
+  "name": "synth-mcp",
   "version": "1.0.0",
-  "description": "",
+  "description": "MCP server for Synth Finance API integration",
   "main": "dist/index.js",
   "bin": {
     "synth-mcp": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "dev": "tsx src/server.ts",
+    "dev:local": "tsx src/index.ts",
+    "start": "node dist/server.js",
+    "start:local": "node dist/index.js",
     "prepare": "npm run build"
   },
   "keywords": [],
@@ -20,8 +22,14 @@
     "@modelcontextprotocol/sdk": "^1.13.1",
     "@types/node": "^24.0.3",
     "axios": "^1.10.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
+    "express": "^4.18.2",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21"
   }
 }

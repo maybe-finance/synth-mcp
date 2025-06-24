@@ -1,10 +1,10 @@
 import { SynthClient } from "../synth-client.js";
+import { enhancedToolDescriptions } from "./enhanced-descriptions.js";
 
 export const transactionTools = [
   {
     name: "enrichTransaction",
-    description:
-      "Enrich, decode, identify, translate, parse, analyze, and clean up cryptic bank transaction descriptions, credit card charges, debit card transactions, bank statement entries, payment descriptions, merchant codes, transaction strings, unclear charges, confusing payments, coded merchant names, abbreviated business names, payment processor codes, square payments, stripe charges, paypal transactions, point of sale codes, ATM transactions, wire transfers, ACH payments, check descriptions, and any unclear financial transaction text. Identifies the actual merchant name, business name, company, store location, merchant category, business type, merchant address, city, state, country, logo, website, and category code. Perfect for understanding what a charge is, who charged you, decoding bank statements, identifying unknown charges, clarifying credit card statements, understanding debit transactions, decoding SQ* SQUARE payments, TST* test charges, identifying recurring charges, subscription payments, online purchases, in-store purchases, restaurant charges, retail purchases, service charges, utility payments, and any other transaction that needs clarification.",
+    description: enhancedToolDescriptions.enrichTransaction.keywords.join(", ") + ". Examples: " + enhancedToolDescriptions.enrichTransaction.exampleQueries.join("; "),
     inputSchema: {
       type: "object",
       properties: {

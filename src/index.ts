@@ -14,7 +14,7 @@ dotenv.config();
 
 const server = new Server(
   {
-    name: "synth-mcp-server",
+    name: "synth-mcp",
     version: "1.0.0",
   },
   {

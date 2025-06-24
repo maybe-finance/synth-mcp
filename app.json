@@ -1,0 +1,28 @@
+{
+  "name": "Synth MCP",
+  "description": "Remote MCP server for Synth Finance API integration",
+  "repository": "https://github.com/yourusername/synth-mcp",
+  "keywords": ["mcp", "synth", "finance", "api", "claude"],
+  "env": {
+    "SYNTH_API_KEY": {
+      "description": "Your Synth Finance API key",
+      "required": false
+    },
+    "PORT": {
+      "description": "Port for the web server",
+      "value": "3000",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "free"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}
