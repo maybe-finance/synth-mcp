@@ -19,7 +19,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Token storage is now handled by tokenStore
+// Store active SSE transports
+const transports = new Map<string, SSEServerTransport>();
 
 // Enable CORS
 app.use(cors({
@@ -489,6 +490,7 @@ app.get('/sse', async (req, res) => {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    console.log(`Tool called: ${name}`);
 
     try {
       switch (name) {
@@ -529,24 +531,66 @@ app.get('/sse', async (req, res) => {
   try {
     await server.connect(transport);
     console.log('MCP server connected successfully');
+    
+    // Store transport for message routing
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    transports.set(sessionId, transport);
+    
+    // Clean up on close
+    transport.onclose = () => {
+      console.log(`Transport closed for session ${sessionId}`);
+      transports.delete(sessionId);
+    };
+    
   } catch (error) {
     console.error('Error connecting MCP server:', error);
     throw error;
   }
 });
 
-// Message endpoint for MCP
-app.post('/message', (req, res) => {
+// Message endpoint for MCP - handles messages from the client
+app.post('/message', async (req, res) => {
   console.log('Message endpoint hit');
+  console.log('Query params:', req.query);
   console.log('Body:', JSON.stringify(req.body));
-  // SSEServerTransport handles the message processing
-  res.status(200).send();
+  
+  // Get session ID from query params (SSE transport adds this)
+  const sessionId = req.query.sessionId as string;
+  if (!sessionId) {
+    console.error('No sessionId in message request');
+    return res.status(400).json({ error: 'Missing sessionId' });
+  }
+  
+  // Find the transport for this session
+  const transport = transports.get(sessionId);
+  if (!transport) {
+    console.error(`No transport found for session ${sessionId}`);
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  try {
+    // Let the transport handle the message
+    await transport.handlePostMessage(req, res);
+  } catch (error) {
+    console.error('Error handling message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Clean up old tokens periodically (older than 30 days)
 setInterval(() => {
   tokenStore.cleanup(30);
 }, 24 * 60 * 60 * 1000); // Daily cleanup
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, closing transports...');
+  for (const [sessionId, transport] of transports.entries()) {
+    transport.close();
+    transports.delete(sessionId);
+  }
+  process.exit(0);
+});
 
 app.listen(PORT, () => {
   console.log(`Synth MCP Server running on http://localhost:${PORT}`);
