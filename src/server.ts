@@ -447,13 +447,17 @@ app.get('/sse', async (req, res) => {
   }
   
   if (!apiKey) {
+    console.error('No API key found for request');
     return res.status(401).json({
       error: 'Authentication required',
       message: 'Please provide a valid token or visit /connect to generate one'
     });
   }
   
+  console.log('API key found, initializing MCP server');
+  
   // Create MCP server
+  // Note: SSEServerTransport expects the path where messages will be POSTed
   const transport = new SSEServerTransport('/message', res);
   const synthClient = new SynthClient(apiKey);
   
@@ -470,13 +474,16 @@ app.get('/sse', async (req, res) => {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
+    console.log('ListTools request received');
+    const toolsList = [
+      ...tools.transactionTools,
+      ...tools.financialDataTools,
+      ...tools.stockTools,
+      ...tools.userTools,
+    ];
+    console.log(`Returning ${toolsList.length} tools`);
     return {
-      tools: [
-        ...tools.transactionTools,
-        ...tools.financialDataTools,
-        ...tools.stockTools,
-        ...tools.userTools,
-      ],
+      tools: toolsList,
     };
   });
 
@@ -518,11 +525,21 @@ app.get('/sse', async (req, res) => {
     }
   });
 
-  await server.connect(transport);
+  console.log('Connecting MCP server to transport...');
+  try {
+    await server.connect(transport);
+    console.log('MCP server connected successfully');
+  } catch (error) {
+    console.error('Error connecting MCP server:', error);
+    throw error;
+  }
 });
 
 // Message endpoint for MCP
 app.post('/message', (req, res) => {
+  console.log('Message endpoint hit');
+  console.log('Body:', JSON.stringify(req.body));
+  // SSEServerTransport handles the message processing
   res.status(200).send();
 });
 
