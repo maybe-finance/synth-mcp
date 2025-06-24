@@ -18,10 +18,16 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Store registered endpoints with their API keys
-const registeredEndpoints = new Map<string, { apiKey: string; createdAt: Date }>();
+// Store tokens and their associated Synth API keys
+interface Token {
+  synthApiKey: string;
+  createdAt: Date;
+  lastUsed: Date;
+}
 
-// Enable CORS for Claude Desktop
+const tokens = new Map<string, Token>();
+
+// Enable CORS
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -31,12 +37,12 @@ app.use(cors({
 
 app.use(express.json());
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'synth-mcp' });
 });
 
-// Root endpoint - show registration page
+// Root page - Instructions
 app.get('/', (req, res) => {
   const html = `
 <!DOCTYPE html>
@@ -45,6 +51,170 @@ app.get('/', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Synth MCP Server</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .section h2 {
+      color: #007bff;
+      margin-bottom: 1rem;
+    }
+    .code-block {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+      overflow-x: auto;
+    }
+    .step {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+    .step-number {
+      display: inline-block;
+      background: #007bff;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 24px;
+      margin-left: -1.5rem;
+      margin-right: 0.5rem;
+      font-size: 0.875rem;
+    }
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      color: #856404;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Synth MCP Server</h1>
+    <p class="subtitle">Connect Claude to your Synth Finance data</p>
+    
+    <div class="section">
+      <h2>Quick Start</h2>
+      <div class="warning">
+        Looking to quickly connect? <a href="/connect">Generate your connection token here</a>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Method 1: Local Installation (Recommended)</h2>
+      <p>Run the MCP server locally with your API key:</p>
+      
+      <div class="step">
+        <span class="step-number">1</span>
+        Install the server globally:
+      </div>
+      <div class="code-block">npm install -g synth-mcp</div>
+      
+      <div class="step">
+        <span class="step-number">2</span>
+        Add to Claude Desktop config:
+      </div>
+      <div class="code-block">{
+  "mcpServers": {
+    "synth": {
+      "command": "synth-mcp",
+      "env": {
+        "SYNTH_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}</div>
+      
+      <div class="step">
+        <span class="step-number">3</span>
+        Restart Claude Desktop
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Method 2: Remote Connection</h2>
+      <p>Connect to our hosted server:</p>
+      
+      <div class="step">
+        <span class="step-number">1</span>
+        <a href="/connect">Generate a connection token</a> with your Synth API key
+      </div>
+      
+      <div class="step">
+        <span class="step-number">2</span>
+        Use the provided URL in Claude Desktop or Claude.ai
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Available Tools</h2>
+      <ul>
+        <li><strong>enrichTransaction</strong> - Analyze and categorize transactions</li>
+        <li><strong>getLiveRates</strong> - Get current exchange rates</li>
+        <li><strong>getHistoricalRates</strong> - Get historical exchange rates</li>
+        <li><strong>searchTickers</strong> - Search for stock tickers</li>
+        <li><strong>getOpenClosePrices</strong> - Get stock price history</li>
+        <li><strong>getUserInfo</strong> - Get your Synth account info</li>
+        <li><strong>getInsiderTrades</strong> - Get insider trading data</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Need Help?</h2>
+      <p>Visit <a href="https://docs.synthfinance.com">docs.synthfinance.com</a> for more information.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  res.send(html);
+});
+
+// Connect page - Generate token
+app.get('/connect', (req, res) => {
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect Synth MCP</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -60,7 +230,7 @@ app.get('/', (req, res) => {
       padding: 2rem;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      max-width: 600px;
+      max-width: 500px;
       width: 100%;
     }
     h1 {
@@ -84,10 +254,6 @@ app.get('/', (req, res) => {
       font-size: 1rem;
       box-sizing: border-box;
     }
-    input:focus {
-      outline: none;
-      border-color: #007bff;
-    }
     button {
       width: 100%;
       padding: 0.75rem;
@@ -110,7 +276,7 @@ app.get('/', (req, res) => {
       border-radius: 4px;
       margin-top: 1rem;
     }
-    .endpoint-url {
+    .url-display {
       background: #f8f9fa;
       padding: 1rem;
       border-radius: 4px;
@@ -118,6 +284,19 @@ app.get('/', (req, res) => {
       word-break: break-all;
       margin: 1rem 0;
       border: 1px solid #dee2e6;
+      cursor: pointer;
+      position: relative;
+    }
+    .url-display:hover {
+      background: #e9ecef;
+    }
+    .copy-hint {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      font-size: 0.75rem;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     .info {
       background: #e7f3ff;
@@ -131,11 +310,11 @@ app.get('/', (req, res) => {
 </head>
 <body>
   <div class="container">
-    <h1>Connect Synth to Claude Desktop</h1>
+    <h1>Connect Synth to Claude</h1>
     <div class="info">
-      Generate a unique endpoint URL for your Synth MCP connection.
+      Generate a secure token to connect Claude to your Synth account.
     </div>
-    <form id="authForm">
+    <form id="connectForm">
       <div class="form-group">
         <label for="apiKey">Your Synth API Key</label>
         <input 
@@ -146,22 +325,28 @@ app.get('/', (req, res) => {
           required
         />
       </div>
-      <button type="submit">Generate Endpoint</button>
+      <button type="submit">Generate Connection URL</button>
     </form>
     <div id="success" class="success">
-      <h2>Success!</h2>
-      <p>Your unique MCP endpoint URL is:</p>
-      <div id="endpointUrl" class="endpoint-url"></div>
-      <p>Add this URL to Claude Desktop as your MCP server endpoint.</p>
+      <h2 style="margin: 0 0 1rem 0; font-size: 1.25rem;">Connection URL Generated!</h2>
+      <p style="margin-bottom: 0.5rem;">Use this URL in Claude:</p>
+      <div id="urlDisplay" class="url-display">
+        <span class="copy-hint">Click to copy</span>
+        <span id="urlText"></span>
+      </div>
+      <p style="margin-top: 1rem; font-size: 0.875rem;">
+        For Claude Desktop: Add this URL as an MCP server<br>
+        For Claude.ai: Go to Settings → Integrations → Add this URL
+      </p>
     </div>
   </div>
   <script>
-    document.getElementById('authForm').addEventListener('submit', async (e) => {
+    document.getElementById('connectForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const apiKey = document.getElementById('apiKey').value;
       
       try {
-        const response = await fetch('/register', {
+        const response = await fetch('/api/tokens', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ apiKey })
@@ -170,16 +355,22 @@ app.get('/', (req, res) => {
         const data = await response.json();
         
         if (response.ok) {
-          const endpointUrl = window.location.origin + '/sse/' + data.endpoint;
-          document.getElementById('endpointUrl').textContent = endpointUrl;
+          const url = window.location.origin + '/sse?token=' + data.token;
+          document.getElementById('urlText').textContent = url;
           document.getElementById('success').style.display = 'block';
           
-          // Copy to clipboard
-          navigator.clipboard.writeText(endpointUrl).then(() => {
-            document.getElementById('success').innerHTML += '<p style="color: #28a745; margin-top: 0.5rem;">✓ Copied to clipboard!</p>';
+          // Copy on click
+          document.getElementById('urlDisplay').addEventListener('click', () => {
+            navigator.clipboard.writeText(url).then(() => {
+              const hint = document.querySelector('.copy-hint');
+              hint.textContent = 'Copied!';
+              setTimeout(() => {
+                hint.textContent = 'Click to copy';
+              }, 2000);
+            });
           });
         } else {
-          alert(data.error || 'Registration failed');
+          alert(data.error || 'Failed to generate token');
         }
       } catch (error) {
         alert('Connection error. Please try again.');
@@ -192,8 +383,8 @@ app.get('/', (req, res) => {
   res.send(html);
 });
 
-// Registration endpoint
-app.post('/register', async (req, res) => {
+// API endpoint to create tokens
+app.post('/api/tokens', async (req, res) => {
   const { apiKey } = req.body;
   
   if (!apiKey) {
@@ -205,53 +396,64 @@ app.post('/register', async (req, res) => {
     const synthClient = new SynthClient(apiKey);
     await synthClient.getUser();
     
-    // Generate unique endpoint
-    const endpoint = crypto.randomBytes(16).toString('hex');
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
     
-    // Store the mapping
-    registeredEndpoints.set(endpoint, {
-      apiKey,
-      createdAt: new Date()
+    // Store token
+    tokens.set(token, {
+      synthApiKey: apiKey,
+      createdAt: new Date(),
+      lastUsed: new Date()
     });
     
-    res.json({ success: true, endpoint });
+    res.json({ token });
   } catch (error) {
     res.status(401).json({ error: 'Invalid API key' });
   }
 });
 
-// SSE endpoint for MCP with unique endpoints
-app.get('/sse/:endpoint?', async (req, res) => {
+// SSE endpoint - accepts token in query param or Bearer token
+app.get('/sse', async (req, res) => {
   console.log('SSE endpoint accessed');
-  console.log('Endpoint:', req.params.endpoint);
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Query params:', req.query);
+  console.log('Authorization header:', req.headers.authorization);
   
+  let token: string | undefined;
   let apiKey: string | undefined;
   
-  // Check if this is a registered endpoint
-  if (req.params.endpoint) {
-    const registration = registeredEndpoints.get(req.params.endpoint);
-    if (registration) {
-      apiKey = registration.apiKey;
+  // Check query parameter first (for Claude Desktop)
+  if (req.query.token) {
+    token = req.query.token as string;
+    const tokenData = tokens.get(token);
+    if (tokenData) {
+      apiKey = tokenData.synthApiKey;
+      tokenData.lastUsed = new Date();
     }
   }
   
-  // Fall back to header/query param for backwards compatibility
-  if (!apiKey) {
-    apiKey = 
-      req.headers.authorization?.replace('Bearer ', '') ||
-      req.headers['x-api-key'] as string ||
-      req.query.apiKey as string;
+  // Check Bearer token (for future OAuth support)
+  if (!apiKey && req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.substring(7);
+    const tokenData = tokens.get(token);
+    if (tokenData) {
+      apiKey = tokenData.synthApiKey;
+      tokenData.lastUsed = new Date();
+    }
+  }
+  
+  // Check environment variable (for local dev)
+  if (!apiKey && process.env.SYNTH_API_KEY) {
+    apiKey = process.env.SYNTH_API_KEY;
   }
   
   if (!apiKey) {
-    res.status(401).json({ 
+    return res.status(401).json({
       error: 'Authentication required',
-      message: 'Please visit the root URL to register and get your unique endpoint'
+      message: 'Please provide a valid token or visit /connect to generate one'
     });
-    return;
   }
-
+  
+  // Create MCP server
   const transport = new SSEServerTransport('/message', res);
   const synthClient = new SynthClient(apiKey);
   
@@ -283,23 +485,19 @@ app.get('/sse/:endpoint?', async (req, res) => {
 
     try {
       switch (name) {
-        // Transaction tools
         case "enrichTransaction":
           return tools.enrichTransaction(synthClient, args as { transaction: string });
 
-        // Financial data tools
         case "getLiveRates":
           return tools.getLiveRates(synthClient, args as { from: string; to: string });
         case "getHistoricalRates":
           return tools.getHistoricalRates(synthClient, args as { from: string; to: string; date?: string });
 
-        // Stock tools
         case "searchTickers":
           return tools.searchTickers(synthClient, args as { query: string });
         case "getOpenClosePrices":
           return tools.getOpenClosePrices(synthClient, args as { ticker: string; startDate: string; endDate?: string; page?: number; perPage?: number });
 
-        // User tools
         case "getUserInfo":
           return tools.getUserInfo(synthClient);
         case "getInsiderTrades":
@@ -325,24 +523,24 @@ app.get('/sse/:endpoint?', async (req, res) => {
 
 // Message endpoint for MCP
 app.post('/message', (req, res) => {
-  // This is handled by the SSE transport
   res.status(200).send();
 });
 
-// Clean up old registrations periodically (older than 30 days)
+// Clean up old tokens periodically (older than 30 days)
 setInterval(() => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
-  for (const [endpoint, registration] of registeredEndpoints.entries()) {
-    if (registration.createdAt < thirtyDaysAgo) {
-      registeredEndpoints.delete(endpoint);
+  for (const [token, data] of tokens.entries()) {
+    if (data.createdAt < thirtyDaysAgo) {
+      tokens.delete(token);
     }
   }
 }, 24 * 60 * 60 * 1000); // Daily cleanup
 
 app.listen(PORT, () => {
-  console.log(`Synth MCP running on http://localhost:${PORT}`);
-  console.log(`Registration page: http://localhost:${PORT}`);
+  console.log(`Synth MCP Server running on http://localhost:${PORT}`);
+  console.log(`Documentation: http://localhost:${PORT}/`);
+  console.log(`Connect page: http://localhost:${PORT}/connect`);
   console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
 });
