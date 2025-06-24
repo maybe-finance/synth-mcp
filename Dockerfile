@@ -2,12 +2,11 @@ FROM node:18
 
 WORKDIR /app
 
-# Copy and install dependencies
-COPY package*.json ./
-RUN npm ci || npm install
-
-# Copy source code
+# Copy everything
 COPY . .
+
+# Install dependencies
+RUN npm install
 
 # Build the application
 RUN npm run build
