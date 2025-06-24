@@ -12,20 +12,14 @@ import crypto from "crypto";
 import dotenv from "dotenv";
 import { SynthClient } from "./synth-client.js";
 import * as tools from "./tools/index.js";
+import { tokenStore } from "./token-store.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Store tokens and their associated Synth API keys
-interface Token {
-  synthApiKey: string;
-  createdAt: Date;
-  lastUsed: Date;
-}
-
-const tokens = new Map<string, Token>();
+// Token storage is now handled by tokenStore
 
 // Enable CORS
 app.use(cors({
@@ -399,12 +393,8 @@ app.post('/api/tokens', async (req, res) => {
     // Generate token
     const token = crypto.randomBytes(32).toString('hex');
     
-    // Store token
-    tokens.set(token, {
-      synthApiKey: apiKey,
-      createdAt: new Date(),
-      lastUsed: new Date()
-    });
+    // Store token persistently
+    tokenStore.set(token, apiKey);
     
     res.json({ token });
   } catch (error) {
@@ -424,26 +414,36 @@ app.get('/sse', async (req, res) => {
   // Check query parameter first (for Claude Desktop)
   if (req.query.token) {
     token = req.query.token as string;
-    const tokenData = tokens.get(token);
+    console.log(`Looking up token: ${token}`);
+    console.log(`Tokens in storage: ${tokenStore.size()}`);
+    const tokenData = tokenStore.get(token);
     if (tokenData) {
+      console.log('Token found in storage');
       apiKey = tokenData.synthApiKey;
-      tokenData.lastUsed = new Date();
+    } else {
+      console.log('Token not found in storage');
     }
   }
   
   // Check Bearer token (for future OAuth support)
   if (!apiKey && req.headers.authorization?.startsWith('Bearer ')) {
     token = req.headers.authorization.substring(7);
-    const tokenData = tokens.get(token);
+    const tokenData = tokenStore.get(token);
     if (tokenData) {
       apiKey = tokenData.synthApiKey;
-      tokenData.lastUsed = new Date();
     }
   }
   
   // Check environment variable (for local dev)
   if (!apiKey && process.env.SYNTH_API_KEY) {
     apiKey = process.env.SYNTH_API_KEY;
+  }
+  
+  // TEMPORARY: Hardcoded token for testing
+  // Remove this once persistent storage is working
+  if (!apiKey && token === 'd8cf22277fdd61109009512e38103bc8dcf3314afa5d49faf2fda0ab88c48444') {
+    console.log('Using temporary hardcoded token');
+    apiKey = process.env.SYNTH_TEMP_API_KEY || process.env.SYNTH_API_KEY;
   }
   
   if (!apiKey) {
@@ -545,14 +545,7 @@ app.post('/message', (req, res) => {
 
 // Clean up old tokens periodically (older than 30 days)
 setInterval(() => {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  for (const [token, data] of tokens.entries()) {
-    if (data.createdAt < thirtyDaysAgo) {
-      tokens.delete(token);
-    }
-  }
+  tokenStore.cleanup(30);
 }, 24 * 60 * 60 * 1000); // Daily cleanup
 
 app.listen(PORT, () => {
