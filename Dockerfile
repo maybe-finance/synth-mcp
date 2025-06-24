@@ -1,27 +1,19 @@
-FROM node:18-alpine
+FROM node:18
 
 WORKDIR /app
 
-# Install Python and build dependencies required for some npm packages
-RUN apk add --no-cache python3 make g++
+# Copy and install dependencies
+COPY package*.json ./
+RUN npm ci || npm install
 
-# Copy package files
-COPY package.json ./
-
-# Install all dependencies
-RUN npm install
-
-# Copy source files
+# Copy source code
 COPY . .
 
-# Build the TypeScript project
+# Build the application
 RUN npm run build
 
-# Remove dev dependencies after build
-RUN npm prune --production
-
-# Expose the port
+# Expose port
 EXPOSE 3000
 
-# Start the server
+# Start the application
 CMD ["npm", "start"]
